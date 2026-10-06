@@ -28,10 +28,6 @@ const Leave = () => {
     const [loading, setLoading] = useState(true);
     const [details, setDetails] = useState(null);
 
-    console.log(leaveRequests)
-
-    console.log(details)
-
 
     const updateLeaveStatus = async (leaveId, newStatus) => {
         try {
@@ -296,14 +292,13 @@ const Leave = () => {
                         </p>
                     </div>
 
-                    <p className="text-sm text-base-content/60">
-                        Showing{" "}
-                        <span className="font-semibold text-base-content">
-                            {filteredRequests.length}
+                    <p className="text-sm bg-yellow-700 text-white p-1 rounded-xl font-bold">
+                        <span>Pending requests:</span>{" "}
+                        <span className="">
+                            {pendingRequests}
                         </span>{" "}
-                        requests
-                    </p>
 
+                    </p>
                 </div>
 
                 {/* Table */}
@@ -762,6 +757,22 @@ const Leave = () => {
                                     </p>
                                     <p className="font-semibold">
                                         {details?.substitute_id || "N/A"}
+                                    </p>
+                                </div>
+                                <div className="bg-base-200 rounded-lg p-3">
+                                    {/* <p className="text-xs text-base-content/60">
+                                        Substitute ID
+                                    </p> */}
+                                    <p className="text-xs text-base-content/60">
+                                        Substitute <span
+                                            className={
+                                                details?.substitute_choice === "Reject"
+                                                    ? "text-red-500 font-semibold text-sm"
+                                                    : details?.substitute_choice === "Accept"
+                                                        ? "text-green-500 font-semibold text-sm"
+                                                        : "text-gray-500 font-semibold text-sm"
+                                            }
+                                        >{details?.substitute_choice || "N/A"}</span> Request
                                     </p>
                                 </div>
 

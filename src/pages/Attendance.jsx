@@ -17,6 +17,7 @@ import {
 
 import api from "../apis/api";
 import { Link } from "react-router";
+import Swal from "sweetalert2";
 
 // =====================================
 // Attendance Component
@@ -41,6 +42,7 @@ const Attendance = () => {
     const [error, setError] = useState("");
 
     const [currentPage, setCurrentPage] = useState(1);
+    const [totalEmployees, setTotalEmployee] = useState()
 
     const itemsPerPage = 10;
 
@@ -194,7 +196,7 @@ const Attendance = () => {
     // =====================================
 
 
-    const totalEmployees = attendanceData.length;
+    // const totalEmployees = attendanceData.length;
 
     const lateCount = attendanceData.filter(
         (item) => item.status === "Late"
@@ -206,13 +208,15 @@ const Attendance = () => {
 
     const presentCount = lateCount + onTimeCount;
 
-    const absentCount = attendanceData.filter(
-        (item) => item.status === "Absent"
-    ).length;
+    // const absentCount = attendanceData.filter(
+    //     (item) => item.status === "Absent"
+    // ).length;
+
+    const absentCount = totalEmployees - presentCount
 
     const attendancePercentage = totalEmployees
         ? Math.round(
-            ((presentCount + onTimeCount + lateCount) /
+            (presentCount /
                 totalEmployees) *
             100
         )
@@ -401,16 +405,55 @@ const Attendance = () => {
         URL.revokeObjectURL(url);
     };
 
-    // =====================================
-    // 10. JSX
-    // =====================================
+    useEffect(() => {
+        const fetchData = async () => {
+            const response = await api.get("api/employees/");
+            setTotalEmployee(response.data.count);
+        };
+
+        fetchData();
+    }, []);
+
+    const deleteAttendanceByDate = async (date) => {
+        Swal.fire({
+            title: "Are you sure?",
+            text: "You won't be able to revert this!",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#3085d6",
+            cancelButtonColor: "#d33",
+            confirmButtonText: "Yes, delete it!"
+        }).then(async (result) => {
+            if (result.isConfirmed)
+                try {
+                    const response = await api.delete(
+                        `api/attendance/?date=${date}`
+                    );
+
+                    console.log(response.data);
+                    if (response.status === 200) {
+                        Swal.fire({
+                            title: "Deleted!",
+                            text: "Your file has been deleted.",
+                            icon: "success"
+                        });
+                    }
+
+                } catch (error) {
+                    console.error(
+                        "Delete attendance error:",
+                        error.response?.data || error.message
+                    );
+                }
+        });
+    };
 
     return (
         <div className="min-h-screen bg-base-200 p-4 md:p-6 lg:p-8">
 
             {/* ===============================
-          Page Header
-      =============================== */}
+                        Page Header
+            =============================== */}
 
             <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
 
@@ -501,7 +544,6 @@ const Attendance = () => {
 
                                 <p className="mt-1 text-xs text-success">
                                     {attendancePercentage}% attendance
-                                    (including late)
                                 </p>
                             </div>
 
@@ -691,8 +733,14 @@ const Attendance = () => {
                             </option>
 
                         </select>
-
                     </div>
+
+                    <button
+                        className="btn btn-error btn-sm text-white mt-4"
+                        onClick={() => deleteAttendanceByDate(selectedDate)}
+                    >
+                        Delete List
+                    </button>
 
                 </div>
 
@@ -812,7 +860,7 @@ const Attendance = () => {
 
                                                 <div>
 
-                                                    <Link to={`/profile/${employee.employeeId}`} className="font-semibold hover:underline">
+                                                    <Link to={`/userInfo/${employee.employeeId}`} className="font-semibold hover:underline">
                                                         {employee.name}
                                                     </Link>
 
@@ -1003,8 +1051,8 @@ const Attendance = () => {
                                 onClick={() => handlePageChange(page)}
                                 disabled={loading}
                                 className={`btn btn-sm join-item ${currentPage === page
-                                        ? "btn-primary"
-                                        : ""
+                                    ? "btn-primary"
+                                    : ""
                                     }`}
                             >
 

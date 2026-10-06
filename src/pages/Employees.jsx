@@ -5,6 +5,7 @@ import {
 } from "react-icons/fi";
 import api from "../apis/api";
 import { Link } from "react-router";
+import { useForm } from "react-hook-form";
 
 const PAGE_SIZE = 10;
 
@@ -26,6 +27,19 @@ export default function Employees() {
     const [importResult, setImportResult] = useState(null);
     const [importError, setImportError] = useState("");
     const fileInputRef = useRef(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const addEmployeeModalRef = useRef(null);
+
+    /*-----add employee form-----*/
+    // import.meta.env.VITE_IMGBB_API_KEY
+    const {
+        register,
+        handleSubmit,
+        watch,
+        reset,
+        setError,
+        formState: { errors },
+    } = useForm()
 
     const fetchEmployees = useCallback(async () => {
         setLoading(true);
@@ -46,6 +60,82 @@ export default function Employees() {
     useEffect(() => {
         fetchEmployees();
     }, [fetchEmployees]);
+
+    const onSubmit = async (data) => {
+        setIsSubmitting(true);
+        try {
+            const imageFile = data.profile_pic[0];
+
+            const imageFormData = new FormData();
+            imageFormData.append("image", imageFile);
+
+            const imageResponse = await fetch(
+                `https://api.imgbb.com/1/upload?key=${import.meta.env.VITE_IMGBB_API_KEY}`,
+                {
+                    method: "POST",
+                    body: imageFormData,
+                }
+            );
+
+            const imageResult = await imageResponse.json();
+
+            if (!imageResult.success) {
+                throw new Error("Image upload failed");
+            }
+
+            // Get image URL from ImgBB
+            const imageUrl = imageResult.data.url;
+
+            console.log("ImgBB URL:", imageUrl);
+
+            // Remove FileList because Django only needs the URL
+            const employeeData = {
+                ...data,
+                profile_pic: imageUrl,
+            };
+
+            console.log("Employee data to send:", employeeData);
+
+            const response = await api.post(
+                "api/add/employees/",
+                employeeData
+            );
+
+            console.log("Employee created:", response.status);
+
+            if (response.status == 201) {
+                console.log("ref value:", addEmployeeModalRef.current);
+                console.log("is open:", addEmployeeModalRef.current?.open);
+                reset();
+                addEmployeeModalRef.current?.close();
+                fetchEmployees()
+            }
+
+            // Clear the form after successful submission
+
+
+        } catch (error) {
+            console.error(
+                "Failed to create employee:",
+                error.response?.data || error.message
+            );
+            if (error.response?.status === 400) {
+                const backendErrors = error.response.data;
+
+                if (backendErrors.confirmPassword) {
+                    setError("confirmPassword", {
+                        type: "server",
+                        message: backendErrors.confirmPassword[0],
+                    });
+                }
+            }
+        }
+        finally {
+            setIsSubmitting(false);
+        }
+    }
+
+
 
     const departments = useMemo(() => [
         "All",
@@ -102,6 +192,28 @@ export default function Employees() {
         name.trim().split(/\s+/).filter(Boolean).slice(0, 2)
             .map((word) => word[0]).join("").toUpperCase() || "?";
 
+
+    const handleUserRole = async (employeeId, role) => {
+        console.log("Employee ID:", employeeId, "Role:", role);
+        try {
+            const response = await api.patch(`api/update/user_role/${employeeId}/`,
+                { role }
+            );
+            console.log("User role updated:", response.status);
+            if (response.status === 200) {
+                setEmployees((prevEmployees) =>
+                    prevEmployees.map((employee) =>
+                        employee.employee_id === employeeId
+                            ? { ...employee, role: role }
+                            : employee
+                    )
+                );
+            }
+        } catch (error) {
+            console.error("Error updating user role:", error);
+        }
+    }
+
     return (
         <div className="min-h-screen bg-base-200 p-4 md:p-6 lg:p-8">
             <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -109,9 +221,12 @@ export default function Employees() {
                     <h1 className="text-2xl font-bold md:text-3xl">Employees</h1>
                     <p className="mt-1 text-sm text-base-content/60">Manage your employee directory</p>
                 </div>
-                <button type="button" onClick={fetchEmployees} disabled={loading || importing} className="btn btn-outline gap-2">
-                    <FiRefreshCw className={loading ? "animate-spin" : ""} /> Refresh
-                </button>
+                <div>
+                    <button className="btn btn-info mr-2" onClick={() => addEmployeeModalRef.current?.showModal()}>Add Employee</button>
+                    <button type="button" onClick={fetchEmployees} disabled={loading || importing} className="btn btn-outline gap-2">
+                        <FiRefreshCw className={loading ? "animate-spin" : ""} /> Refresh
+                    </button>
+                </div>
             </div>
 
             <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -197,17 +312,19 @@ export default function Employees() {
                 {listError && <div role="alert" className="alert alert-error m-4 w-auto"><span>{listError}</span><button type="button" onClick={fetchEmployees} className="btn btn-sm">Retry</button></div>}
                 <div className="overflow-x-auto">
                     <table className="table">
-                        <thead><tr><th>Employee</th><th>Department</th><th>Designation</th><th>Contact</th><th>Machine User ID</th></tr></thead>
+                        <thead><tr>
+                            <th>Employee</th><th>Department</th><th>Designation</th><th>Contact</th><th>Machine ID</th><th>Role</th>
+                        </tr></thead>
                         <tbody>
                             {loading ? (
-                                <tr><td colSpan={5} className="py-16 text-center"><span className="loading loading-spinner loading-lg" /> <p>Loading employees...</p></td></tr>
+                                <tr><td colSpan={6} className="py-16 text-center"><span className="loading loading-spinner loading-lg" /> <p>Loading employees...</p></td></tr>
                             ) : pageEmployees.length ? pageEmployees.map((employee) => (
                                 <tr key={employee.id ?? employee.employee_id} className="hover">
                                     <td><div className="flex items-center gap-3">
                                         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-content">{getInitials(employee.name)}</div>
                                         <div>
                                             <Link
-                                                to={`/profile/${employee.employee_id}`}
+                                                to={`/userInfo/${employee.employee_id}`}
                                                 className="font-semibold hover:underline"
                                             >
                                                 {employee.name}
@@ -225,9 +342,15 @@ export default function Employees() {
                                         <p className="flex items-center gap-2"><FiPhone className="opacity-50" />{employee.phone || "—"}</p>
                                     </div></td>
                                     <td>{employee.machine_user_id || "—"}</td>
+                                    <td>
+                                        <select value={employee.role} className="select" onChange={(e) => handleUserRole(employee.employee_id, e.target.value)}>
+                                            <option value="User">User</option>
+                                            <option value="Admin">Admin</option>
+                                        </select>
+                                    </td>
                                 </tr>
                             )) : (
-                                <tr><td colSpan={5} className="py-16 text-center"><FiUsers size={40} className="mx-auto mb-3 opacity-30" /><p className="font-semibold">No employees found</p><p className="text-sm opacity-50">Try changing your search or filters.</p></td></tr>
+                                <tr><td colSpan={6} className="py-16 text-center"><FiUsers size={40} className="mx-auto mb-3 opacity-30" /><p className="font-semibold">No employees found</p><p className="text-sm opacity-50">Try changing your search or filters.</p></td></tr>
                             )}
                         </tbody>
                     </table>
@@ -243,6 +366,337 @@ export default function Employees() {
                     </div>
                 </div>
             </div>
+            <dialog
+                ref={addEmployeeModalRef}
+                id="add_employee_modal"
+                className="modal"
+            >
+                <div className="modal-box max-w-3xl">
+
+                    <h3 className="font-bold text-2xl mb-6">
+                        Add Employee
+                    </h3>
+
+                    <form onSubmit={handleSubmit(onSubmit)}>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                            {/* Employee ID */}
+                            <div>
+                                <label className="label">
+                                    <span className="label-text">
+                                        Employee ID
+                                    </span>
+                                </label>
+
+                                <input
+                                    type="text"
+                                    placeholder="EMP001"
+                                    className="input input-bordered w-full"
+                                    {...register("employee_id", {
+                                        required: "Employee ID is required",
+                                    })}
+                                />
+
+                                {errors.employee_id && (
+                                    <p className="text-error text-sm mt-1">
+                                        {errors.employee_id.message}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Name */}
+                            <div>
+                                <label className="label">
+                                    <span className="label-text">
+                                        Name
+                                    </span>
+                                </label>
+
+                                <input
+                                    type="text"
+                                    placeholder="Employee name"
+                                    className="input input-bordered w-full"
+                                    {...register("name", {
+                                        required: "Name is required",
+                                    })}
+                                />
+
+                                {errors.name && (
+                                    <p className="text-error text-sm mt-1">
+                                        {errors.name.message}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Department */}
+                            <div>
+                                <label className="label">
+                                    <span className="label-text">
+                                        Department
+                                    </span>
+                                </label>
+
+                                <input
+                                    type="text"
+                                    placeholder="IT"
+                                    className="input input-bordered w-full"
+                                    {...register("department", {
+                                        required: "Department is required",
+                                    })}
+                                />
+
+                                {errors.department && (
+                                    <p className="text-error text-sm mt-1">
+                                        {errors.department.message}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Designation */}
+                            <div>
+                                <label className="label">
+                                    <span className="label-text">
+                                        Designation
+                                    </span>
+                                </label>
+
+                                <input
+                                    type="text"
+                                    placeholder="Software Engineer"
+                                    className="input input-bordered w-full"
+                                    {...register("designation", {
+                                        required: "Designation is required",
+                                    })}
+                                />
+
+                                {errors.designation && (
+                                    <p className="text-error text-sm mt-1">
+                                        {errors.designation.message}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Email */}
+                            <div>
+                                <label className="label">
+                                    <span className="label-text">
+                                        Email
+                                    </span>
+                                </label>
+
+                                <input
+                                    type="email"
+                                    placeholder="employee@example.com"
+                                    className="input input-bordered w-full"
+                                    {...register("email", {
+                                        required: "Email is required",
+                                        pattern: {
+                                            value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                                            message: "Enter a valid email address",
+                                        },
+                                    })}
+                                />
+
+                                {errors.email && (
+                                    <p className="text-error text-sm mt-1">
+                                        {errors.email.message}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Phone */}
+                            <div>
+                                <label className="label">
+                                    <span className="label-text">
+                                        Phone
+                                    </span>
+                                </label>
+
+                                <input
+                                    type="tel"
+                                    placeholder="01XXXXXXXXX"
+                                    className="input input-bordered w-full"
+                                    {...register("phone", {
+                                        required: "Phone number is required",
+                                    })}
+                                />
+
+                                {errors.phone && (
+                                    <p className="text-error text-sm mt-1">
+                                        {errors.phone.message}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Machine User ID */}
+                            <div>
+                                <label className="label">
+                                    <span className="label-text">
+                                        Machine User ID
+                                    </span>
+                                </label>
+
+                                <input
+                                    type="number"
+                                    placeholder="1001"
+                                    className="input input-bordered w-full"
+                                    {...register("machine_user_id", {
+                                        required: "Machine User ID is required",
+                                    })}
+                                />
+
+                                {errors.machine_user_id && (
+                                    <p className="text-error text-sm mt-1">
+                                        {errors.machine_user_id.message}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Join Date */}
+                            <div>
+                                <label className="label">
+                                    <span className="label-text">
+                                        Join Date
+                                    </span>
+                                </label>
+
+                                <input
+                                    type="date"
+                                    className="input input-bordered w-full"
+                                    {...register("join_date", {
+                                        required: "Join date is required",
+                                    })}
+                                />
+
+                                {errors.join_date && (
+                                    <p className="text-error text-sm mt-1">
+                                        {errors.join_date.message}
+                                    </p>
+                                )}
+                            </div>
+
+                        </div>
+
+                        {/* Address */}
+                        <div className="mt-4">
+                            <label className="label">
+                                <span className="label-text">
+                                    Address
+                                </span>
+                            </label>
+
+                            <textarea
+                                placeholder="Employee address"
+                                className="textarea textarea-bordered w-full"
+                                rows={3}
+                                {...register("address")}
+                            />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            {/*Password */}
+                            <div>
+                                <label className="label">
+                                    <span className="label-text font-medium">
+                                        Password
+                                    </span>
+                                </label>
+
+                                <input
+                                    type="text"
+                                    placeholder="Password"
+                                    className="input input-bordered w-full"
+                                    {...register("password", {
+                                        required: "Password is required",
+                                    })}
+                                />
+
+                                {errors.password && (
+                                    <p className="text-error text-sm mt-1">
+                                        {errors.password.message}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Confirm Password */}
+                            <div>
+                                <label className="label">
+                                    <span className="label-text font-medium">
+                                        Confirm Password
+                                    </span>
+                                </label>
+
+                                <input
+                                    type="text"
+                                    placeholder="Confirm Password"
+                                    className="input input-bordered w-full"
+                                    {...register("confirmPassword", {
+                                        required: "Confirm Password is required",
+                                    })}
+                                />
+
+                                {errors.confirmPassword && (
+                                    <p className="text-error text-sm mt-1">
+                                        {errors.confirmPassword.message}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Profile Picture */}
+                        <div className="mt-4">
+                            <label className="label">
+                                <span className="label-text">
+                                    Profile Picture
+                                </span>
+                            </label>
+                            <input
+                                type="file"
+                                accept="image/*"
+                                className="file-input file-input-bordered w-full"
+                                {...register("profile_pic", {
+                                    required: "Employee image is required",
+                                })}
+                            />
+                            {errors.profile_pic && (
+                                <p className="text-red-500 font-bold">{errors.profile_pic.message}</p>
+                            )}
+                            {/* <input
+                                type="file"
+                                className="file-input file-input-bordered w-full"
+                                {...register("profile_pic")}
+                            /> */}
+                        </div>
+
+                        {/* Buttons */}
+                        <div className="modal-action">
+
+                            <button
+                                type="button"
+                                className="btn"
+                                onClick={() => addEmployeeModalRef.current?.close()}
+                            >
+                                Cancel
+                            </button>
+
+                            <button
+                                type="submit"
+                                className="btn btn-primary"
+                                disabled={isSubmitting}
+                            >
+                                {isSubmitting ? (
+                                    <>
+                                        <span className="loading loading-spinner loading-sm"></span>
+                                        Adding...
+                                    </>
+                                ) : (
+                                    "Add Employee"
+                                )}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </dialog>
         </div>
     );
 }

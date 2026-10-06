@@ -11,24 +11,101 @@ import {
     FiAlertCircle,
     FiPlus,
     FiMapPin,
-    FiEdit,
     FiFileText,
+    FiEdit,
+    FiKey,
+    FiTrash2,
+    FiMoreVertical,
     FiX,
 } from "react-icons/fi";
 import api from "../apis/api";
-import { useParams } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import axios from "axios";
 import { useForm } from "react-hook-form";
+import { FaBullseye } from "react-icons/fa";
+import Swal from "sweetalert2";
 
-const Profile = () => {
+const UserInfo = () => {
     const { employeeId } = useParams();
-    const [showLeaveModal, setShowLeaveModal] = useState(false);
     const [attendance, setAttendance] = useState([]);
     const [employeeData, setEmployeeData] = useState(null);
     const [leaveRequests, setLeaveRequests] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const navigate = useNavigate();
 
-    console.log(leaveRequests)
+    const {
+        register,
+        handleSubmit: handleUpdateEmployee,
+        watch,
+        reset,
+        setError,
+        formState: { errors },
+    } = useForm()
+
+    const {
+        register: resetPasswordRegister,
+        handleSubmit: handleResetPassword,
+        reset: resetPasswordForm,
+        formState: { errors: resetPasswordErrors },
+    } = useForm()
+
+
+    useEffect(() => {
+        if (employeeData) {
+            reset({
+                employee_id: employeeData.employee_id || "",
+                name: employeeData.name || "",
+                department: employeeData.department || "",
+                designation: employeeData.designation || "",
+                email: employeeData.email || "",
+                phone: employeeData.phone || "",
+                machine_user_id: employeeData.machine_user_id || "",
+                join_date: employeeData.join_date || "",
+                address: employeeData.address || "",
+            });
+        }
+    }, [employeeData, reset]);
+
+
+
+    const onResetPassword = async (data) => {
+        try {
+            const response = await api.patch(
+                `api/update/employee-password/${employeeId}/`,
+                {
+                    password: data.password,
+                    confirmPassword: data.confirmPassword,
+                }
+            );
+
+            console.log("Password updated successfully:", response.status);
+
+            if (response.status === 200) {
+                const modal = document.getElementById("my_modal_1");
+
+                if (modal) {
+                    modal.close();
+                }
+                Swal.fire({
+                    icon: "success",
+                    title: "Update Successful!",
+                    text: "Password updated successfully.",
+                    timer: 4000,
+                    timerProgressBar: true,
+                    draggable: true,
+                    showConfirmButton: false
+                });
+            }
+
+        } catch (error) {
+            console.error(
+                "Password update error:",
+                error.response?.data || error.message
+            );
+        }
+
+    }
 
     const getCurrentMonth = () => {
         const now = new Date();
@@ -164,7 +241,6 @@ const Profile = () => {
     /*-------------------end-------------------------*/
 
 
-
     useEffect(() => {
         const getEmployeeAttendance = async () => {
             try {
@@ -191,33 +267,84 @@ const Profile = () => {
         getEmployeeAttendance();
     }, [employeeId]);
 
+    const getEmployeeData = async () => {
+        try {
+            setLoading(true);
+
+            const response = await api.get(
+                `api/employee/${employeeId}/`
+            );
+
+            // DRF returns the employee data directly
+            setEmployeeData(response.data.data);
+
+        } catch (error) {
+            console.error(
+                "Get employee data error:",
+                error.response?.data || error.message
+            );
+
+            setEmployeeData(null);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const getEmployeeData = async () => {
-            try {
-                setLoading(true);
-
-                const response = await api.get(
-                    `api/employee/${employeeId}/`
-                );
-
-                // DRF returns the employee data directly
-                setEmployeeData(response.data.data);
-
-            } catch (error) {
-                console.error(
-                    "Get employee data error:",
-                    error.response?.data || error.message
-                );
-
-                setEmployeeData(null);
-            } finally {
-                setLoading(false);
-            }
-        };
-
         getEmployeeData();
     }, [employeeId]);
+
+
+    const onEmployeeUpdate = async (data) => {
+        setLoading(true)
+        setIsSubmitting(true);
+
+        try {
+            const response = await api.patch(
+                `api/update/employee/${data.employee_id}/`,
+                data
+            );
+            console.log("Employee updated:", response.status);
+
+            if (response.status == 200) {
+                const modal = document.getElementById("my_modal_4");
+
+                if (modal) {
+                    modal.close();
+                }
+                reset();
+                await getEmployeeData()
+                Swal.fire({
+                    icon: "success",
+                    title: "Update Successful!",
+                    text: "Employee info updated successfully.",
+                    timer: 4000,
+                    timerProgressBar: true,
+                    draggable: true,
+                    showConfirmButton: false
+                });
+            }
+        } catch (error) {
+            console.error(
+                "Failed to create employee:",
+                error.response?.data || error.message
+            );
+            if (error.response?.status === 400) {
+                const backendErrors = error.response.data;
+
+                if (backendErrors.confirmPassword) {
+                    setError("confirmPassword", {
+                        type: "server",
+                        message: backendErrors.confirmPassword[0],
+                    });
+                }
+            }
+        }
+        finally {
+            setIsSubmitting(false);
+            setLoading(false)
+        }
+    }
 
 
     useEffect(() => {
@@ -307,44 +434,6 @@ const Profile = () => {
 
 
     // --------------------------------------------------
-    // Temporary Leave Data
-    // --------------------------------------------------
-    const leaveHistory = [
-        {
-            id: 1,
-            type: "Casual Leave",
-            startDate: "05 Aug 2026",
-            endDate: "06 Aug 2026",
-            days: 2,
-            status: "Approved",
-        },
-        {
-            id: 2,
-            type: "Sick Leave",
-            startDate: "15 Jul 2026",
-            endDate: "16 Jul 2026",
-            days: 2,
-            status: "Approved",
-        },
-        {
-            id: 3,
-            type: "Casual Leave",
-            startDate: "20 Jun 2026",
-            endDate: "20 Jun 2026",
-            days: 1,
-            status: "Approved",
-        },
-        {
-            id: 4,
-            type: "Annual Leave",
-            startDate: "28 Aug 2026",
-            endDate: "01 Sep 2026",
-            days: 5,
-            status: "Pending",
-        },
-    ];
-
-    // --------------------------------------------------
     // Attendance Calculations
     // --------------------------------------------------
 
@@ -359,19 +448,6 @@ const Profile = () => {
     const absentDays = currentMonthAttendance.filter(
         (item) => item.status === "Absent"
     ).length;
-
-    // --------------------------------------------------
-    // Form Handlers
-    // --------------------------------------------------
-
-    const handleLeaveChange = (e) => {
-        const { name, value } = e.target;
-
-        setLeaveForm((previous) => ({
-            ...previous,
-            [name]: value,
-        }));
-    };
 
     const getAttendanceBadge = (status) => {
         if (status === "Present") {
@@ -427,119 +503,59 @@ const Profile = () => {
         );
     };
 
+    const onError = (errors) => {
+        console.log("Form validation errors:", errors);
 
-    /*------handle leave form submission*/
-
-    const {
-        register,
-        handleSubmit,
-        watch,
-        setValue,
-        reset,
-        formState: { errors, isSubmitting },
-    } = useForm({
-        defaultValues: {
-            start_date: "",
-            end_date: "",
-            reason: "",
-            leave_type: "Casual Leave",
-            application_date: new Date().toISOString().split("T")[0],
-            substitute_name: "",
-            substitute_id: "",
-            address_during_leave: "",
-        },
-    });
-
-    const startDate = watch("start_date");
-    const endDate = watch("end_date");
-
-    const calculateLeaveDays = () => {
-        if (!startDate || !endDate) {
-            return 0;
+        if (loading) {
+            <span className="loading loading-infinity loading-xl"></span>
         }
-
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-
-        if (end < start) {
-            return 0;
-        }
-
-        const difference =
-            Math.floor(
-                (end - start) / (1000 * 60 * 60 * 24)
-            ) + 1;
-
-        return difference;
     };
 
-    const leaveDays = calculateLeaveDays();
+    const handleDelete = async (employeeId) => {
+        Swal.fire({
+            title: "Are you sure?",
+            text: "You won't be able to revert this!",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#3085d6",
+            cancelButtonColor: "#d33",
+            confirmButtonText: "Yes, delete it!"
+        }).then(async(result) => {
+            if (result.isConfirmed) {
+                const response = await api.delete(
+                    `api/delete/employee/${employeeId}/`
+                );
 
-    const handleLeaveSubmit = async (data) => {
-        console.log("Leave form submitted:", data);
-        try {
-            const response = await api.post(
-                "leave/list/",
-                {
-                    name: data.name,
-                    employee_id: data.employee_id,
-                    department: data.department,
-                    designation: data.designation,
-                    leave_type: data.leave_type,
-                    start_date: data.start_date,
-                    end_date: data.end_date,
-                    reason: data.reason,
-                    application_date: data.application_date,
-                    substitute_name: data.substitute_name,
-                    substitute_id: data.substitute_id,
-                    address_during_leave: data.address_during_leave,
+                if (response.status == 204) {
+                    Swal.fire({
+                        icon: "success",
+                        title: "Deleted!",
+                        text: "Employee deleted successfully.",
+                        timer: 4000,
+                        timerProgressBar: true,
+                        draggable: true,
+                        showConfirmButton: false
+                    });
+                    navigate("/employees")
                 }
-            );
+            }
+        });
 
-            console.log("Leave request created:", response.data);
-
-            reset({
-                name: "",
-                employee_id: employeeData?.employee_id || "",
-                leave_type: "Casual Leave",
-                department: "",
-                designation: "",
-                start_date: "",
-                end_date: "",
-                reason: "",
-                application_date: new Date().toISOString().split("T")[0],
-                substitute_name: "",
-                substitute_id: "",
-                address_during_leave: "",
-            });
-
-            setShowLeaveModal(false);
-
-        } catch (error) {
-            console.error(
-                "Leave submission error:",
-                error.response?.data || error.message
-            );
-        }
-    };
-
-    useEffect(() => {
-        setValue("leave_days", leaveDays);
-    }, [leaveDays, setValue]);
+    }
 
     return (
         <div className="min-h-screen bg-base-200 p-4 md:p-6 lg:p-8">
 
-            {/* ==================================================
+            {/* ==============================================
                          PROFILE HEADER
-                    ================================================== */}
+               =============================================== */}
 
             <div className="card mb-6 border border-base-300 bg-base-100 shadow-sm">
                 <div className="card-body">
 
                     {/* =========================================
                           PROFILE HEADER
-                    ========================================= */}
+                        ========================================= */}
                     <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
 
                         {/* Employee Information */}
@@ -575,10 +591,6 @@ const Profile = () => {
                                     <h1 className="text-2xl font-bold md:text-3xl">
                                         {employeeData?.name || "N/A"}
                                     </h1>
-
-                                    <span className="badge badge-success text-white">
-                                        Active
-                                    </span>
                                 </div>
 
                                 {/* Designation */}
@@ -619,19 +631,58 @@ const Profile = () => {
 
                         {/* Action Buttons */}
                         <div className="flex flex-wrap gap-2">
-                            <button className="btn btn-outline gap-2">
-                                <FiEdit size={17} />
-                                Edit Profile
-                            </button>
+                            <div className="dropdown dropdown-end">
+                                <div
+                                    tabIndex={0}
+                                    role="button"
+                                    className="btn btn-sm btn-outline gap-2"
+                                >
+                                    <FiMoreVertical size={18} />
+                                    Actions
+                                </div>
 
-                            <button
-                                className="btn btn-primary gap-2"
-                                onClick={() => setShowLeaveModal(true)}
-                            >
-                                <FiPlus size={18} />
-                                Apply Leave
-                            </button>
+                                <ul
+                                    tabIndex={-1}
+                                    className="dropdown-content menu bg-base-100 rounded-box z-50 mt-2 w-56 p-2 shadow-xl border border-base-300"
+                                >
+                                    <li>
+                                        <button
+                                            onClick={() =>
+                                                document.getElementById("my_modal_4").showModal()
+                                            }
+                                        >
+                                            <FiEdit size={17} />
+                                            Edit Profile
+                                        </button>
+                                    </li>
+
+                                    <li>
+                                        <button
+                                            onClick={() =>
+                                                document.getElementById("my_modal_1").showModal()
+                                            }
+                                        >
+                                            <FiKey size={17} />
+                                            Reset Password
+                                        </button>
+                                    </li>
+
+                                    <li>
+                                        <button
+                                            onClick={() =>
+                                                handleDelete(employeeData?.employee_id)
+                                            }
+                                            className="text-error"
+                                        >
+                                            <FiTrash2 size={17} />
+                                            Delete Account
+                                        </button>
+                                    </li>
+                                </ul>
+                            </div>
+
                         </div>
+
                     </div>
 
                     {/* =========================================
@@ -716,8 +767,8 @@ const Profile = () => {
 
 
             {/* ==================================================
-    PERSONAL INFORMATION
-================================================== */}
+                PERSONAL INFORMATION
+              ================================================== */}
             <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
             </div>
 
@@ -1040,16 +1091,6 @@ const Profile = () => {
                         </p>
                     </div>
 
-                    <button
-                        className="btn btn-primary btn-sm gap-2"
-                        onClick={() =>
-                            setShowLeaveModal(true)
-                        }
-                    >
-                        <FiPlus size={16} />
-                        Apply Leave
-                    </button>
-
                 </div>
 
                 <div className="overflow-x-auto">
@@ -1106,289 +1147,366 @@ const Profile = () => {
                             ))}
 
                         </tbody>
-
                     </table>
-
                 </div>
             </div>
+            <dialog id="my_modal_4" className="modal">
+                <div className="modal-box w-11/12 md:w-7/12 max-w-5xl">
+                    <form onSubmit={handleUpdateEmployee(onEmployeeUpdate)}>
+                        <h3 className="font-bold text-lg mb-4">Update Employee</h3>
 
-            {/* ==================================================
-                APPLY LEAVE DAISYUI MODAL
-            ================================================== */}
-            {showLeaveModal && (
-                <dialog
-                    className="modal modal-open"
-                    open
-                >
-                    <div className="modal-box w-11/12 max-w-4xl max-h-[90vh] overflow-y-auto">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-                        {/* Modal Header */}
-                        <div className="mb-4 flex items-center justify-between border-b pb-3">
+                            {/* Employee ID */}
                             <div>
-                                <h3 className="text-xl font-bold tracking-wide uppercase text-base-content">
-                                    Leave Approval Form
-                                </h3>
-                                <p className="mt-0.5 text-xs text-base-content/60">
-                                    Fill out the official details for your leave application request
-                                </p>
-                            </div>
-
-                            <button
-                                className="btn btn-circle btn-ghost btn-sm"
-                                onClick={() => setShowLeaveModal(false)}
-                            >
-                                <FiX size={18} />
-                            </button>
-                        </div>
-
-                        {/* Form matching the paper layout */}
-                        <form
-                            onSubmit={handleSubmit(handleLeaveSubmit)}
-                            className="space-y-4 text-sm">
-
-                            {/* Date Row */}
-                            {/* Application Date */}
-                            <div className="flex justify-end items-center gap-2">
-                                <span className="font-semibold">Date:</span>
+                                <label className="label">
+                                    <span className="label-text">
+                                        Employee ID
+                                    </span>
+                                </label>
 
                                 <input
-                                    // type="date"
-                                    {...register("application_date", {
-                                        required: "Application date is required",
+                                    type="text"
+                                    placeholder="EMP001"
+                                    className="input input-bordered w-full"
+                                    {...register("employee_id", {
+                                        required: "Employee ID is required",
                                     })}
-                                    readOnly
-                                    className="input input-bordered input-sm w-48"
                                 />
+
+                                {errors.employee_id && (
+                                    <p className="text-error text-sm mt-1">
+                                        {errors.employee_id.message}
+                                    </p>
+                                )}
                             </div>
 
-                            {/* Employee Information Grid */}
-                            <div className="border border-base-300 rounded-lg overflow-hidden">
-                                <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x border-base-300">
-                                    <div className="p-2.5 flex items-center gap-2 bg-base-100">
-                                        <span className="font-semibold w-28 shrink-0">Name:</span>
-                                        <input
-                                            type="text"
-                                            value={employeeData?.name || ''}
-                                            {...register("name")}
-                                            readOnly
-                                            className="input input-ghost input-sm w-full focus:bg-transparent"
-                                        />
-                                    </div>
-                                    <div className="p-2.5 flex items-center gap-2 bg-base-100">
-                                        <span className="font-semibold w-28 shrink-0">ID NO:</span>
-                                        <input
-                                            type="text"
-                                            value={employeeData?.employee_id || ''}
-                                            {...register("employee_id")}
-                                            readOnly
-                                            className="input input-ghost input-sm w-full focus:bg-transparent"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x border-t border-base-300">
-                                    <div className="p-2.5 flex items-center gap-2 bg-base-100">
-                                        <span className="font-semibold w-28 shrink-0">Designation:</span>
-                                        <input
-                                            type="text"
-                                            value={employeeData?.designation || ''}
-                                            {...register("designation")}
-                                            readOnly
-                                            className="input input-ghost input-sm w-full focus:bg-transparent"
-                                        />
-                                    </div>
-                                    <div className="border-t border-base-300 p-2.5 flex items-center gap-2 bg-base-100">
-                                        <span className="font-semibold w-28 shrink-0">Department:</span>
-                                        <input
-                                            type="text"
-                                            value={employeeData?.department || ''}
-                                            {...register("department")}
-                                            readOnly
-                                            className="input input-ghost input-sm w-full focus:bg-transparent"
-                                        />
-                                    </div>
-                                    {/* <div className="p-2.5 flex items-center gap-2 bg-base-100">
-                                        <span className="font-semibold w-28 shrink-0">Date of Join:</span>
-                                        <input
-                                            type="date"
-                                            value={employeeData?.dateOfJoin || ''}
-                                            readOnly
-                                            className="input input-ghost input-sm w-full focus:bg-transparent"
-                                        />
-                                    </div> */}
-                                </div>
-
-
-                            </div>
-
-                            {/* Leave Duration Section */}
-                            {/* Leave Duration */}
-                            <div className="border border-base-300 rounded-lg p-3 grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
-
-                                {/* Leave Type */}
-                                <div className="md:col-span-3">
-                                    <select
-                                        {...register("leave_type", {
-                                            required: "Leave type is required",
-                                        })}
-                                        className="select select-bordered select-sm w-full"
-                                    >
-                                        <option value="Casual Leave">
-                                            Casual Leave
-                                        </option>
-
-                                        <option value="Sick Leave">
-                                            Sick Leave
-                                        </option>
-
-                                        <option value="Annual Leave">
-                                            Annual Leave
-                                        </option>
-
-                                        <option value="Emergency Leave">
-                                            Emergency Leave
-                                        </option>
-
-                                        <option value="Unpaid Leave">
-                                            Unpaid Leave
-                                        </option>
-                                    </select>
-                                </div>
-
-                                {/* Start Date */}
-                                <div className="md:col-span-3 flex items-center gap-2">
-                                    <span className="text-xs font-medium">
-                                        From
+                            {/* Name */}
+                            <div>
+                                <label className="label">
+                                    <span className="label-text">
+                                        Name
                                     </span>
+                                </label>
 
-                                    <input
-                                        type="date"
-                                        {...register("start_date", {
-                                            required: "Start date is required",
-                                        })}
-                                        className="input input-bordered input-sm w-full"
-                                    />
-                                </div>
+                                <input
+                                    type="text"
+                                    placeholder="Employee name"
+                                    className="input input-bordered w-full"
+                                    {...register("name", {
+                                        required: "Name is required",
+                                    })}
+                                />
 
-                                {/* End Date */}
-                                <div className="md:col-span-3 flex items-center gap-2">
-                                    <span className="text-xs font-medium">
-                                        To
+                                {errors.name && (
+                                    <p className="text-error text-sm mt-1">
+                                        {errors.name.message}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Department */}
+                            <div>
+                                <label className="label">
+                                    <span className="label-text">
+                                        Department
                                     </span>
+                                </label>
 
-                                    <input
-                                        type="date"
-                                        {...register("end_date", {
-                                            required: "End date is required",
-                                            validate: (value) =>
-                                                !startDate ||
-                                                value >= startDate ||
-                                                "End date cannot be before start date",
-                                        })}
-                                        className="input input-bordered input-sm w-full"
-                                    />
-                                </div>
+                                <input
+                                    type="text"
+                                    placeholder="IT"
+                                    className="input input-bordered w-full"
+                                    {...register("department", {
+                                        required: "Department is required",
+                                    })}
+                                />
 
-                                {/* Days */}
-                                <div className="md:col-span-3 flex items-center gap-1">
-                                    <span className="text-xs font-medium">
-                                        Days:
+                                {errors.department && (
+                                    <p className="text-error text-sm mt-1">
+                                        {errors.department.message}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Designation */}
+                            <div>
+                                <label className="label">
+                                    <span className="label-text">
+                                        Designation
                                     </span>
+                                </label>
 
-                                    <input
-                                        type="text"
-                                        {...register("leave_days")}
-                                        readOnly
-                                        className="input input-bordered input-sm w-full bg-base-200 text-center font-bold"
-                                    />
-                                </div>
+                                <input
+                                    type="text"
+                                    placeholder="Software Engineer"
+                                    className="input input-bordered w-full"
+                                    {...register("designation", {
+                                        required: "Designation is required",
+                                    })}
+                                />
 
+                                {errors.designation && (
+                                    <p className="text-error text-sm mt-1">
+                                        {errors.designation.message}
+                                    </p>
+                                )}
                             </div>
 
-                            {/* Reason & Address Grid */}
-                            <div className="border border-base-300 rounded-lg divide-y divide-base-300">
-                                <div className="p-3 flex flex-col md:flex-row gap-2 items-start">
-                                    <span className="font-semibold w-40 shrink-0 pt-1">Reason for leave:</span>
-                                    <textarea
-                                        name="reason"
+                            {/* Email */}
+                            <div>
+                                <label className="label">
+                                    <span className="label-text">
+                                        Email
+                                    </span>
+                                </label>
 
-                                        onChange={handleLeaveChange}
-                                        {...register("reason")}
-                                        placeholder="Provide a detailed reason for your leave..."
-                                        className="textarea textarea-bordered textarea-sm w-full h-20"
-                                        required
-                                    />
-                                </div>
-                                <div className="p-3 flex flex-col md:flex-row gap-2 items-start">
-                                    <span className="font-semibold w-40 shrink-0 pt-1">Address during leave:</span>
-                                    <textarea
-                                        name="addressDuringLeave"
-                                        onChange={handleLeaveChange}
-                                        {...register("address_during_leave")}
-                                        placeholder="Enter contact address/location while on leave..."
-                                        className="textarea textarea-bordered textarea-sm w-full h-16"
-                                    />
-                                </div>
+                                <input
+                                    type="email"
+                                    placeholder="employee@example.com"
+                                    className="input input-bordered w-full"
+                                    {...register("email", {
+                                        required: "Email is required",
+                                        pattern: {
+                                            value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                                            message: "Enter a valid email address",
+                                        },
+                                    })}
+                                />
+
+                                {errors.email && (
+                                    <p className="text-error text-sm mt-1">
+                                        {errors.email.message}
+                                    </p>
+                                )}
                             </div>
 
-                            {/* Duties Carried Out By Section */}
-                            <div className="border border-base-300 rounded-lg p-3 space-y-3">
-                                <span className="font-semibold block">Duties will be carried out by:</span>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    <input
-                                        type="text"
-                                        name="substitute_name"
-                                        placeholder="Colleague Name"
-                                        {...register("substitute_name")}
-                                        className="input input-bordered input-sm w-full"
-                                    />
-                                    <input
-                                        type="number"
-                                        placeholder="Colleague Employee ID"
-                                        {...register("substitute_id", {
-                                            required: "Employee ID is required",
-                                            pattern: {
-                                                value: /^\d{1,7}$/,
-                                                message: "Employee ID must be 1–7 digits",
-                                            },
-                                        })}
-                                        maxLength={7}
-                                        inputMode="numeric"
-                                        className="input input-bordered input-sm w-full"
-                                    />
-                                </div>
+                            {/* Phone */}
+                            <div>
+                                <label className="label">
+                                    <span className="label-text">
+                                        Phone
+                                    </span>
+                                </label>
+
+                                <input
+                                    type="tel"
+                                    className="input input-bordered w-full"
+                                    {...register("phone", {
+                                        required: "Phone number is required",
+                                    })}
+                                />
+
+                                {errors.phone && (
+                                    <p className="text-error text-sm mt-1">
+                                        {errors.phone.message}
+                                    </p>
+                                )}
                             </div>
 
-                            {/* Modal Actions */}
-                            <div className="mt-6 flex justify-end gap-2 border-t pt-4">
-                                <button
-                                    type="button"
-                                    className="btn btn-ghost btn-sm"
-                                    onClick={() => setShowLeaveModal(false)}
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="btn btn-primary btn-sm px-6"
-                                >
-                                    Submit Leave Request
-                                </button>
+                            {/* Machine User ID */}
+                            <div>
+                                <label className="label">
+                                    <span className="label-text">
+                                        Machine User ID
+                                    </span>
+                                </label>
+
+                                <input
+                                    type="number"
+                                    {...register("machine_user_id", {
+                                        required: "Machine User ID is required",
+                                    })}
+                                />
+
+                                {errors.machine_user_id && (
+                                    <p className="text-error text-sm mt-1">
+                                        {errors.machine_user_id.message}
+                                    </p>
+                                )}
                             </div>
 
-                        </form>
+                            {/* Join Date */}
+                            <div>
+                                <label className="label">
+                                    <span className="label-text">
+                                        Join Date
+                                    </span>
+                                </label>
 
-                    </div>
+                                <input
+                                    type="date"
+                                    className="input input-bordered w-full"
+                                    {...register("join_date", {
+                                        required: "Join date is required",
+                                    })}
+                                />
 
-                    {/* Modal Backdrop */}
-                    <div
-                        className="modal-backdrop"
-                        onClick={() => setShowLeaveModal(false)}
-                    ></div>
-                </dialog>
-            )}
+                                {errors.join_date && (
+                                    <p className="text-error text-sm mt-1">
+                                        {errors.join_date.message}
+                                    </p>
+                                )}
+                            </div>
+
+                        </div>
+
+                        {/* Address */}
+                        <div className="mt-4">
+                            <label className="label">
+                                <span className="label-text">
+                                    Address
+                                </span>
+                            </label>
+
+                            <textarea
+                                className="textarea textarea-bordered w-full"
+                                rows={3}
+                                {...register("address")}
+                            />
+                        </div>
+
+                        {/* 
+                        Profile Picture 
+                        <div className="mt-4">
+                            <label className="label">
+                                <span className="label-text">
+                                    Profile Picture
+                                </span>
+                            </label>
+                            <input
+                                type="file"
+                                accept="image/*"
+                                className="file-input file-input-bordered w-full"
+                                defaultValue={employeeData?.profile_pic || ""}
+                                {...register("profile_pic", {
+                                    // required: "Employee image is required",
+                                })}
+                            />
+                            {errors.profile_pic && (
+                                <p className="text-red-500 font-bold mt-1">{errors.profile_pic.message}</p>
+                            )}
+                        </div>
+                        */}
+
+
+                        {/* Buttons */}
+                        <div className="modal-action">
+                            <button
+                                type="button"
+                                className="btn"
+                                onClick={() => document.getElementById('my_modal_4').close()}
+                            >
+                                Cancel
+                            </button>
+
+                            <input
+                                type="submit"
+                                className="btn btn-primary"
+                                value="Confirm"
+                            />
+                            {/* {isSubmitting ? (
+                                    <>
+                                        <span className="loading loading-spinner loading-sm"></span>
+                                        Updating...
+                                    </>
+                                ) : (
+                                    "Confirm"
+                                )}
+                            </input> */}
+                        </div>
+                    </form>
+                </div>
+            </dialog>
+            {/* reset password dialog */}
+            <dialog id="my_modal_1" className="modal">
+                <div className="modal-box">
+                    <h3 className="font-bold text-lg mb-4">Reset Password</h3>
+
+                    <form onSubmit={handleResetPassword(onResetPassword, onError)}>
+                        <div className="flex flex-col gap-4">
+                            {/* Password */}
+                            <div>
+                                <label className="label">
+                                    <span className="label-text font-medium">Password</span>
+                                </label>
+                                <input
+                                    type="password"
+                                    placeholder="Enter new password"
+                                    className="input input-bordered w-full"
+                                    {...resetPasswordRegister("password", {
+                                        required: "Password is required",
+                                    })}
+                                />
+                                {resetPasswordErrors.password && (
+                                    <p className="text-error text-sm mt-1">
+                                        {resetPasswordErrors.password.message}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Confirm Password */}
+                            <div>
+                                <label className="label">
+                                    <span className="label-text font-medium">Confirm Password</span>
+                                </label>
+                                <input
+                                    type="password"
+                                    placeholder="Confirm new password"
+                                    className="input input-bordered w-full"
+                                    {...resetPasswordRegister("confirmPassword", {
+                                        required: "Confirm Password is required",
+                                    })}
+                                />
+                                {resetPasswordErrors.confirmPassword && (
+                                    <p className="text-error text-sm mt-1">
+                                        {resetPasswordErrors.confirmPassword.message}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Modal Actions */}
+                        <div className="modal-action">
+                            {/* if there is a button in form, it will close the modal */}
+                            <button type="button" className="btn" onClick={() => document.getElementById('my_modal_1').close()}>
+                                Cancel
+                            </button>
+                            <button type="submit" className="btn btn-primary">
+                                Confirm
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </dialog>
         </div>
     );
 };
 
-export default Profile;
+export default UserInfo;
+
+// const imageFile = data.profile_pic[0];
+
+// const imageFormData = new FormData();
+// imageFormData.append("image", imageFile);
+
+// const imageResponse = await fetch(
+//     `https://api.imgbb.com/1/upload?key=${import.meta.env.VITE_IMGBB_API_KEY}`,
+//     {
+//         method: "POST",
+//         body: imageFormData,
+//     }
+// );
+
+// const imageResult = await imageResponse.json();
+
+// if (!imageResult.success) {
+//     throw new Error("Image upload failed");
+// }
+
+// // Get image URL from ImgBB
+// const imageUrl = imageResult.data.url;
+
+// console.log("ImgBB URL:", imageUrl);
+
+// Remove FileList because Django only needs the URL

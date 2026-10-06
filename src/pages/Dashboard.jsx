@@ -314,7 +314,7 @@ const Dashboard = () => {
 
         setError(
           err.message ||
-            "Failed to fetch dashboard data"
+          "Failed to fetch dashboard data"
         );
       } finally {
         setLoading(false);
@@ -344,8 +344,8 @@ const Dashboard = () => {
         record.employee?.employee_id;
 
       if (employeeId !== null &&
-          employeeId !== undefined &&
-          employeeId !== "") {
+        employeeId !== undefined &&
+        employeeId !== "") {
 
         attendanceMap.set(
           String(employeeId),
@@ -363,10 +363,12 @@ const Dashboard = () => {
 
   const totalEmployees = employees.length;
 
-  const presentCount = uniqueAttendance.filter(
-    (item) =>
-      item.attendanceStatus === "Present"
-  ).length;
+  // const presentCount = uniqueAttendance.filter(
+  //   (item) =>
+  //     item.attendanceStatus === "Present"
+  // ).length;
+
+  // console.log(presentCount)
 
   const onTimeCount = uniqueAttendance.filter(
     (item) =>
@@ -378,6 +380,8 @@ const Dashboard = () => {
       item.attendanceStatus === "Late"
   ).length;
 
+  const presentCount = onTimeCount + lateCount
+
   const explicitAbsentCount = uniqueAttendance.filter(
     (item) =>
       item.attendanceStatus === "Absent"
@@ -385,8 +389,7 @@ const Dashboard = () => {
 
   // Present, On Time and Late are attended statuses.
 
-  const attendedCount =
-    presentCount + onTimeCount + lateCount;
+  // const attendedCount = presentCount
 
   // Count employees without an attendance record
   // as absent, matching the existing dashboard logic.
@@ -425,8 +428,8 @@ const Dashboard = () => {
   const attendancePercentage =
     totalEmployees > 0
       ? Math.round(
-          (attendedCount / totalEmployees) * 100
-        )
+        (presentCount / totalEmployees) * 100
+      )
       : 0;
 
   // =====================================
@@ -480,17 +483,29 @@ const Dashboard = () => {
     try {
       setImporting(true);
 
+      // const response = await api.post(
+      //   IMPORT_API,
+      //   formData
+      // );
+
       const response = await api.post(
-        IMPORT_API,
-        formData
+        "api/attendance/import/",
+        formData,
+        {
+          headers: {
+            "Content-Type": undefined,
+          },
+        }
       );
+
+      console.log("Attendance import response:", response);
 
       const data = response.data;
 
       alert(
         `Attendance import completed!\n\n` +
-          `Imported: ${data.importedCount ?? 0}\n` +
-          `Failed: ${data.failedCount ?? 0}`
+        `Imported: ${data.importedCount ?? 0}\n` +
+        `Failed: ${data.failedCount ?? 0}`
       );
 
       // Refresh dashboard after importing
@@ -504,8 +519,8 @@ const Dashboard = () => {
 
       alert(
         err.response?.data?.message ||
-          err.message ||
-          "Failed to import attendance"
+        err.message ||
+        "Failed to import attendance"
       );
     } finally {
       setImporting(false);
@@ -810,7 +825,7 @@ const Dashboard = () => {
 
             <span>
               {attendanceLoaded
-                ? attendedCount
+                ? presentCount
                 : "—"}{" "}
               employees attended
             </span>
@@ -1001,7 +1016,7 @@ const Dashboard = () => {
               HEADCOUNT BY TEAM
           =========================== */}
 
-      
+
         </div>
 
         {/* ===============================

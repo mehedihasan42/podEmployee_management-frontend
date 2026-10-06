@@ -10,25 +10,61 @@ import Attendance from './pages/Attendance'
 import Leave from './pages/Leave'
 import Payroll from './pages/Payroll'
 import Dashboard from './pages/Dashboard'
-import Profile from './pages/Profile'
+import UserInfo from './pages/UserInfo'
+import UserAttendance from './users/Attendance'
+import UserLeave from './users/Leave'
+import Login from './users/Login'
+import Profile from './users/Profile'
+import PrivateRoute from './routes/PrivateRoute'
+import LeaveRequestToSubstitute from './users/LeaveRequestToSubstitute'
+import ChangePass from './users/ChangePass'
+import AdminRouter from './routes/AdminRouter'
 
 const router = createBrowserRouter([
-  {
-    path: "/",
-    Component: HomeDrawer,
+  { path: "login", Component: Login },
+   {
+    element: <AdminRouter />,
     children: [
-      { index: true, Component: Dashboard },
-      { path: "employees", Component: Employees },
-      { path: "attendance", Component: Attendance },
-      { path: "leave", Component: Leave },
-      { path: "payroll", Component: Payroll },
-      { path: "profile", Component: Profile },
       {
-        path: "/profile/:employeeId",
-        Component: Profile,
-      }
-    ],
+        path: "/",
+        Component: HomeDrawer,
+        children: [
+          { index: true, Component: Dashboard },
+          { path: "employees", Component: Employees },
+          { path: "attendance", Component: Attendance },
+          { path: "leave", Component: Leave },
+          { path: "payroll", Component: Payroll },
+          { path: "userInfo", Component: UserInfo },
+          {
+            path: "/userInfo/:employeeId",
+            Component: UserInfo,
+          }
+        ],
+      },
+    ]
   },
+  {
+    element: <PrivateRoute />,
+    children: [
+      {
+        path: "/",
+        Component: HomeDrawer,
+        children: [
+          { path: "userInfo", Component: UserInfo },
+          { path: "profile", Component: Profile },
+          { path: "user/attendance", Component: UserAttendance },
+          { path: "user/leave", Component: UserLeave },
+          { path: "user/changePassword", Component: ChangePass },
+          { path: "user/leaveRequestToSubstitute", Component: LeaveRequestToSubstitute },
+
+          {
+            path: "/userInfo/:employeeId",
+            Component: UserInfo,
+          }
+        ],
+      },
+    ]
+  }
 
 ]);
 
